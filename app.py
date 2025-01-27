@@ -15,7 +15,7 @@ if not os.path.exists(INVOICE_DIR):
 
 # Admin credentials
 ADMIN_USERNAME = 'admin'
-ADMIN_PASSWORD = 'admin@22629651'
+ADMIN_PASSWORD = 'admin@123'
 
 @app.route('/')
 def Invoice():
