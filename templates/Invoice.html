@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Manager</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        /* Moved inline styles to internal CSS for now (move to an external file later) */
+        body {
+            -webkit-text-size-adjust: 100%;
+            /* For webkit-based browsers */
+            text-size-adjust: 100%;
+            /* For standard browsers */
+        }
+
+        .container {
+            margin-top: 50px;
+        }
+
+        .form-control {
+            margin-bottom: 15px;
+        }
+
+        .btn-logout {
+            margin-top: 15px;
+        }
+
+        .invoice-title {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .invoice-details {
+            margin-top: 20px;
+        }
+
+        .invoice-footer {
+            margin-top: 40px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Login Section -->
+        <div id="loginSection">
+            <h2>Admin Login</h2>
+            <form id="loginForm" method="POST" onsubmit="refresh" autocomplete="off">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" class="form-control" id="username" name="username" required autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" class="form-control" id="password" name="password" required
+                        autocomplete="off">
+                </div>
+                <button type="submit" class="btn btn-primary">Login</button>
+            </form>
+        </div>
+
+        <!-- Admin Panel -->
+        <div id="adminPanel" style="display: none;">
+            <h2>Admin Panel</h2>
+            <button id="logoutBtn" class="btn btn-danger btn-logout">Logout</button>
+
+            <div id="createInvoiceSection">
+                <h3>Create Invoice</h3>
+                <form id="invoiceForm" method="POST" autocomplete="off">
+                    <div class="form-group">
+                        <label for="invoice_number">Invoice Number:</label>
+                        <input type="text" class="form-control" id="invoice_number" name="invoice_number" required
+                            autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="mobile_number">Mobile Number:</label>
+                        <input type="text" class="form-control" id="mobile_number" name="mobile_number" required
+                            autocomplete="tel">
+                    </div>
+                    <div class="form-group">
+                        <label for="customer_name">Customer Name:</label>
+                        <input type="text" class="form-control" id="customer_name" name="customer_name" required
+                            autocomplete="name">
+                    </div>
+                    <div class="form-group">
+                        <label for="amount">Amount:</label>
+                        <input type="number" class="form-control" id="amount" name="amount" required autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="tax">Tax:</label>
+                        <input type="number" class="form-control" id="tax" name="tax" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="due_date">Due Date:</label>
+                        <input type="date" class="form-control" id="due_date" name="due_date" required
+                            autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="items">Items (comma-separated):</label>
+                        <input type="text" class="form-control" id="items" name="items" required autocomplete="off">
+                    </div>
+                    <button type="submit" class="btn btn-success">Create Invoice</button>
+                </form>
+            </div>
+
+            <!-- View Invoices Section -->
+            <div id="viewInvoicesSection">
+                <h3>View All Invoices</h3>
+                <button id="viewInvoicesBtn" class="btn btn-secondary">View Invoices</button>
+                <ul id="invoiceList"></ul>
+            </div>
+        </div>
+
+        <!-- Download Invoice Section -->
+        <div id="downloadSection">
+            <h2>Download Invoice</h2>
+            <form id="downloadForm" method="POST" autocomplete="off">
+                <div class="form-group">
+                    <label for="userMobileNumber">Enter Mobile Number:</label>
+                    <input type="text" class="form-control" id="userMobileNumber" name="mobile_number" required
+                    autocomplete="off" pattern="^[0-9]{10}$" title="Please enter a valid 10-digit mobile number">
+                </div>
+                <button type="submit" class="btn btn-primary">Download Invoice</button>
+            </form>
+        </div>
+    </div>
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $('#loginForm input').attr('autocomplete', 'off');
+        $(document).ready(function () {
+            // Admin Login
+            $('#loginForm').submit(function (event) {
+                event.preventDefault();
+                const username = $('#username').val();
+                const password = $('#password').val();
+                
+                $.post('/login', { username, password }, function (response) {
+                    if (response.status === 'success') {
+                        $('#loginSection').hide();
+                        $('#adminPanel').show();
+                        alert(response.message);
+                    } else {
+                        alert(response.message);
+                    }
+                });
+            });
+            
+            $('#viewInvoicesBtn').click(function () {
+                $.get('/view-invoices', function (response) {
+                    if (response.status === 'success') {
+                        const invoiceList = $('#invoiceList');
+                        invoiceList.empty(); // Clear the list before adding new invoices
+                        if (response.invoices && response.invoices.length > 0) {
+                            response.invoices.forEach(file => {
+                                invoiceList.append(`
+                                    <li>
+                                        ${file} 
+                                        <button class="btn btn-danger btn-sm" onclick="deleteInvoice('${file}')">Delete</button>
+                                        <button class="btn btn-primary btn-sm" onclick="downloadInvoice('${file}')">Download</button>
+                                    </li>
+                                `);
+                            });
+                        } else {
+                            invoiceList.append('<li>No invoices found</li>');
+                        }
+                    } else {
+                        alert(response.message);
+                    }
+                });
+            });
+
+            // Delete Invoice
+            window.deleteInvoice = function (filename) {
+                if (confirm(`Are you sure you want to delete ${filename}?`)) {
+                    $.ajax({
+                        url: `/delete-invoice/${filename}`,
+                        type: 'DELETE',
+                        success: function (response) {
+                            alert(response.message);
+                            $('#viewInvoicesBtn').click(); // Reload invoices list
+                        },
+                        error: function (response) {
+                            alert(response.responseJSON.message);
+                        }
+                    });
+                }
+            };
+            
+
+            // Logout
+            $('#logoutBtn').click(function () {
+                $.get('/logout', function () {
+                    $('#adminPanel').hide();
+                    $('#loginSection').show();
+                });
+            });
+
+            // Function to generate the next invoice number
+            function getNextInvoiceNumber() {
+                let lastInvoiceNumber = localStorage.getItem('lastInvoiceNumber'); // Retrieve last invoice number from local storage
+                if (!lastInvoiceNumber) {
+                    lastInvoiceNumber = 0; // Initialize to 0 if no invoice number is stored
+                }
+                const newInvoiceNumber = parseInt(lastInvoiceNumber) + 1; // Increment the invoice number
+                localStorage.setItem('lastInvoiceNumber', newInvoiceNumber); // Store the new invoice number in local storage
+                return newInvoiceNumber;
+            }
+
+            // Create Invoice
+            $('#invoiceForm').submit(function (event) {
+                event.preventDefault();
+
+                const invoice_number = getNextInvoiceNumber(); // Get the next invoice number
+                const mobile_number = $('#mobile_number').val();
+                const customer_name = $('#customer_name').val();
+                const amount = $('#amount').val();
+                const tax = $('#tax').val();
+                const due_date = $('#due_date').val();
+                const items = $('#items').val(); // Get items from the new input field
+
+                $.post('/create-invoice', {
+                    invoice_number,
+                    mobile_number,
+                    customer_name,
+                    amount,
+                    tax,
+                    due_date,
+                    items
+                })
+                    .done(function (response) {
+                        alert(response.message);
+                        $('#invoiceForm')[0].reset();  // Reset form fields after submission
+                        localStorage.setItem('lastInvoiceNumber', invoice_number); // Update the invoice number in localStorage
+                    })
+                    .fail(function (error) {
+                        alert("There was an issue creating the invoice. Please try again.");
+                    });
+            });
+
+            // Prevent suggestions/autofill in the form fields
+            $('#invoiceForm input').attr('autocomplete', 'off');
+            $('#invoiceForm textarea').attr('autocomplete', 'off');
+            // Prevent suggestions/autofill in the login form fields
+
+            // Download Invoice
+            $('#downloadForm').submit(function (event) {
+                event.preventDefault();
+                const mobile_number = $('#userMobileNumber').val();
+
+                $.ajax({
+                    url: '/download-invoice',
+                    type: 'POST',
+                    data: { mobile_number },
+                    xhrFields: { responseType: 'blob' },
+                    success: function (data, status, xhr) {
+                        const filename = xhr.getResponseHeader('Content-Disposition').split('filename=')[1].replace(/"/g, '');
+                        const blob = new Blob([data], { type: 'application/pdf' });
+                        const link = document.createElement('a');
+                        link.href = window.URL.createObjectURL(blob);
+                        link.download = filename;
+                        link.click();
+                    },
+                    error: function (response) {
+                        alert(response.responseJSON.message);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>
